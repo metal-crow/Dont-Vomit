@@ -163,12 +163,54 @@ static bool SetupMainLoop(){
 	return true;
 }
 
+static float cubeClock = 0;
+void verify_user_playing(ovrPosef EyeRenderPose[2]){
+	//have cube rotate in circle around room
+	//TODO later fix to be more dynamic
+	roomScene->cube->Pos = XMFLOAT3(9 * sin(cubeClock), 3, 11 * cos(cubeClock));
+	
+	float distance_x = abs(roomScene->cube->Pos.x - mainCam->Pos.m128_f32[0]);
+	float distance_y = abs(roomScene->cube->Pos.y - mainCam->Pos.m128_f32[2]);
+	float hypot = sqrt((distance_x*distance_x) + (distance_y*distance_y));
+	float avg_yaw = ((EyeRenderPose[0].Orientation.y + EyeRenderPose[1].Orientation.y) / 2.0)*PI;
+	
+	if (
+		//user must be within distance of cube or
+		(
+			(roomScene->cube->Pos.x + CUBE_SPACE > mainCam->Pos.m128_f32[0]) && 
+			(roomScene->cube->Pos.x - CUBE_SPACE < mainCam->Pos.m128_f32[0]) &&
+			(roomScene->cube->Pos.y + CUBE_SPACE > mainCam->Pos.m128_f32[2]) &&
+			(roomScene->cube->Pos.y - CUBE_SPACE < mainCam->Pos.m128_f32[2])
+		) ||
+		//user must be facing cube
+		(
+			abs((hypot*sin(avg_yaw)) + CUBE_OFFSET > distance_x) &&
+			abs((hypot*sin(avg_yaw)) - CUBE_OFFSET < distance_x) &&
+			abs((hypot*cos(avg_yaw)) + CUBE_OFFSET > distance_y) &&
+			abs((hypot*cos(avg_yaw)) - CUBE_OFFSET < distance_y)
+		)
+	){
+		//quickly decrease the lost time, but dont give a brief glance a full reset
+		if (lost_track_time > 0){
+			lost_track_time -= 10;
+		}
+	}
+	else{
+		lost_track_time++;
+	}
+
+	if (lost_track_time > FPS*SECONDS_TO_GAME_OVER){
+		game_over = true;
+	}
+	printf("tracking time %d\n", lost_track_time);
+}
+
 #define CHECK_TIMING(i) (((float)(frameIndex / FPS) > timings[i]) && ((float)(frameIndex / FPS) < (timings[i+1]+timings[i])))
 
 void enable_effects(){
 	//standard timing based enable
 	for (int i = 0; i < NUM_EFFECTS; i++){
-		if (CHECK_TIMING(i*2)){
+		if (CHECK_TIMING(i*2) && !game_over){
 			effects_enabled[i] = true;
 		}
 		else{
@@ -176,7 +218,7 @@ void enable_effects(){
 		}
 	}
 
-	//start randomly enabling effects
+	//TODO start randomly enabling effects once main coreography done
 }
 static ovrVector3f      IPD_Persistance_copy[2];
 static float axes[3] = { 0, 0, 0 };//roll, pitch, yaw
@@ -186,7 +228,7 @@ static XMMATRIX buffered_frames[25 * 2];
 void trigger_effects(ovrVector3f* HmdToEyeOffset){
 	//flicker every few frames
 	if (effects_enabled[0]){
-		#ifdef DEBUGGING
+		#if DEBUGGING_CUR_EFFECT
 				printf("flickering ");
 		#endif
 		if (frameIndex%flicker_frames == 0){
@@ -211,7 +253,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 
 	//slowly ajust IPD normal->wide
 	if (effects_enabled[2]){
-		#ifdef DEBUGGING
+		#if DEBUGGING_CUR_EFFECT
 				printf("IPD1 ");
 		#endif
 		float percent = (frameIndex - FPS * timings[4]) / (FPS * timings[5]);
@@ -221,7 +263,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 
 	//more quickly ajust IPD wide--->normal--->small
 	if (effects_enabled[3]){
-		#ifdef DEBUGGING
+		#if DEBUGGING_CUR_EFFECT
 				printf("IPD2 ");
 		#endif
 		float percent = (frameIndex - FPS * timings[6]) / (FPS * timings[7]);
@@ -231,7 +273,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 
 	//quickly and randomly ajust IDP every few frames
 	if (effects_enabled[4]){
-		#ifdef DEBUGGING
+		#if DEBUGGING_CUR_EFFECT
 				printf("IPD_rand ");
 		#endif
 		if (frameIndex % 13 == 0){
@@ -248,7 +290,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 
 	//cross eyes
 	if (effects_enabled[5]){
-		#ifdef DEBUGGING
+		#if DEBUGGING_CUR_EFFECT
 				printf("IPD_cross ");
 		#endif
 		float ipd_0_x = HmdToEyeOffset[0].x;
@@ -258,7 +300,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 
 	//slowly rotate yaw and pitch
 	if (effects_enabled[6]){
-		#ifdef DEBUGGING
+		#if DEBUGGING_CUR_EFFECT
 				printf("roll_pitch_yaw ");
 		#endif
 		if (frameIndex % 6 == 0){
@@ -275,7 +317,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 
 	//increase latency up to 25ms
 	if (effects_enabled[7]){
-		#ifdef DEBUGGING
+		#if DEBUGGING_CUR_EFFECT
 				printf("latency:%d ", latency);
 		#endif
 		if (latency < 25 && frameIndex % 20 == 0){
@@ -283,7 +325,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 		}
 	}
 
-	#ifdef DEBUGGING
+	#if DEBUGGING_CUR_EFFECT
 		printf("%d\n", frameIndex);
 	#endif
 }
@@ -322,10 +364,6 @@ static bool MainLoop()
 		printf("Time %f\n", frameIndex / FPS);
 	}
 
-	//**Handle verification user is playing**
-	
-
-
 	//**Get dynamic rift settings**
 	// Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
 	ovrEyeRenderDesc eyeRenderDesc[2];
@@ -341,10 +379,14 @@ static bool MainLoop()
 	enable_effects();
 	trigger_effects(HmdToEyeOffset);
 
-	//**Render Scene**
+	//**get headset data**
 	double sensorSampleTime;    // sensorSampleTime is fed into the layer later
 	ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime);
 
+	//**Handle verification user is playing**
+	verify_user_playing(EyeRenderPose);
+
+	//**Render Scene**
 	if (isVisible)
 	{
 		for (int eye = 0; eye < 2; ++eye)
@@ -391,7 +433,9 @@ static bool MainLoop()
 			// Commit rendering to the swap chain
 			pEyeRenderTexture[eye]->Commit();
 		}
+
 		frameIndex++;
+		cubeClock += 0.005f;
 	}
 
 

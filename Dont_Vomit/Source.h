@@ -4,6 +4,7 @@
 #include <Xinput.h>
 #include <stdlib.h>
 
+//controller
 #define PI 3.14159265
 #define XRIGHT 32768
 #define XLEFT -32768
@@ -18,8 +19,17 @@
 #define square 16384
 #define triangle 32768
 
+//constants
 #define FPS 90.0
+#define CUBE_SPACE 2
+#define CUBE_OFFSET 3.5
+#define SECONDS_TO_GAME_OVER 7
 
+//game state
+long lost_track_time = 0;
+bool game_over = false;
+
+//effects
 unsigned char flicker_frames = 30;
 
 #define NUM_EFFECTS 8
@@ -37,6 +47,8 @@ float timings[] = { 5, 66, //flickering
 //if an effect is enabled
 bool effects_enabled[NUM_EFFECTS];
 
+//helper
 #define STARTTIME 0
-#define DEBUGGING 1
+#define DEBUGGING_CUR_EFFECT 1
+
 #endif

@@ -796,6 +796,7 @@ struct Scene
 	Model *Models[MAX_MODELS];
 	int numModels;
 	Model* timer;
+	Model* cube;
 
 	void Add(Model * n)
 	{
@@ -808,7 +809,6 @@ struct Scene
 		for (int i = 0; i < numModels; ++i){
 			Models[i]->Render(projView, R, G, B, A, standardUniforms);
 		}
-		//timer->Render(projView, R, G, B, A, standardUniforms);
 	}
 
 	void Init()
@@ -845,6 +845,15 @@ struct Scene
 				)
 			)
 		); // Ceiling
+
+		TriangleSet cube_t;
+        cube_t.AddSolidColorBox(0.5f, -0.5f, 0.5f, -0.5f, 0.5f, -0.5f, 0xff404040);
+		cube = new Model(&cube_t, XMFLOAT3(0, 0, 0), XMFLOAT4(0, 0, 0, 1),
+							new Material(
+								new Texture(false, 256, 256, Texture::AUTO_CEILING)
+							)
+						);
+		Add(cube);//Moving cube
 	}
 
 	Scene() :
