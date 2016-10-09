@@ -199,7 +199,7 @@ void verify_user_playing(ovrPosef EyeRenderPose[2]){
 		lost_track_time++;
 	}
 
-	if (lost_track_time > FPS*SECONDS_TO_GAME_OVER){
+	if (lost_track_time > FPS*SECONDS_TO_GAME_OVER && !game_over){
 		game_over = true;
 		printf("You lasted %f seconds\n", FPS*frameIndex);
 	}
@@ -222,7 +222,10 @@ void enable_effects(){
 		}
 	}
 
-	//TODO start randomly enabling effects once main coreography done
+	//start randomly enabling/disabling effects every 25 seconds once main coreography done
+	if (frameIndex/FPS > 125 && (long long)(frameIndex/FPS)%25==0 && !game_over){
+		effects_enabled[rand() % NUM_EFFECTS] = rand() > 0.3*RAND_MAX;//bias towards enabling
+	}
 }
 static ovrVector3f      IPD_Persistance_copy[2];
 static float axes[3] = { 0, 0, 0 };//roll, pitch, yaw
@@ -332,6 +335,9 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 		if (latency < 25 && frameIndex % 20 == 0){
 			latency++;
 		}
+	}
+	else{
+		latency = 1;
 	}
 
 	#if DEBUGGING_CUR_EFFECT
