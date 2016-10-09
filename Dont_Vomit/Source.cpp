@@ -229,6 +229,12 @@ static bool MainLoop()
 	if (CHECK_TIMING(2)){
 		flicker_frames = 3;
 	}
+	//reset back to walls
+	else{
+		for (int i = 0; i < roomScene->numModels; i++){
+			roomScene->Models[i]->Fill->Tex->AutoFillTexture(2);
+		}
+	}
 	//slowly ajust IPD normal->wide
 	if (CHECK_TIMING(4)){
 #ifdef DEBUGGING
@@ -274,15 +280,21 @@ static bool MainLoop()
 		HmdToEyeOffset[1].x = ipd_0_x-0.5;
 	}
 	//slowly rotate yaw and pitch
-	if (CHECK_TIMING(12) && frameIndex % 6 == 0){
+	if (CHECK_TIMING(12)){
 		static float axes[3] = { 0, 0, 0 };//roll, pitch, yaw
 #ifdef DEBUGGING
 		printf("roll_pitch_yaw ");
 #endif
-		axes[2] += 0.003;
-		axes[1] += 0.003;
-		axes[0] += 0.003;
-		mainCam->Rot = XMQuaternionRotationRollPitchYaw(axes[1], axes[2], axes[0]);
+		if (frameIndex % 6 == 0){
+			axes[2] += 0.003;
+			axes[1] += 0.003;
+			axes[0] += 0.003;
+			mainCam->Rot = XMQuaternionRotationRollPitchYaw(axes[1], axes[2], axes[0]);
+		}
+	}
+	//unset rotations
+	else{
+		mainCam->Rot = XMQuaternionRotationRollPitchYaw(0,0,0);
 	}
 	//increase latency up to 25ms
 	static int latency = 1;
@@ -330,6 +342,7 @@ static bool MainLoop()
 				p.M[0][3], p.M[1][3], p.M[2][3], p.M[3][3]);
 			XMMATRIX prod;
 
+			//rendering handling for latency
 			if (CHECK_TIMING(14)){
 				XMMATRIX new_prod = XMMatrixMultiply(view, proj);
 				//put this new frame into queue

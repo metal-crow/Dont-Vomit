@@ -24,15 +24,15 @@ unsigned char flicker_frames = 30;
 				
 //i is start time, i+1 is length
 float timings[] = { 5, 46, //flickering
-					10, 41, //faster flickering
-					23, 8.1, //IPD 1
-					31, 8, //IPD 2
-					39, 12, //IPD rand
-					51, INFINITY, //IPD crossed
-					63, 17, //yaw and pitch
-					80, INFINITY, //latency
+					11, 60, //faster flickering
+					23, 16.1, //IPD 1
+					39, 16, //IPD 2
+					55, 16, //IPD rand
+					71, INFINITY, //IPD crossed
+					83, 29, //yaw and pitch
+					100, INFINITY, //latency
 				 };
 
-#define STARTTIME 78*FPS //timings[12]*FPS
+#define STARTTIME 0
 #define DEBUGGING 1
 #endif
