@@ -303,12 +303,17 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 		#if DEBUGGING_CUR_EFFECT
 				printf("roll_pitch_yaw ");
 		#endif
-		if (frameIndex % 6 == 0){
-			axes[2] += 0.003;
-			axes[1] += 0.003;
-			axes[0] += 0.003;
-			mainCam->Rot = XMQuaternionRotationRollPitchYaw(axes[1], axes[2], axes[0]);
+		if (frameIndex % 8 == 0){
+			axes[2] += 0.003;//yaw
 		}
+		if (frameIndex % 9 == 0){
+			axes[1] += 0.003;//pitch
+		}
+		if (frameIndex % 10 == 0){
+			axes[0] += 0.003;//roll
+		}
+		mainCam->Rot = XMQuaternionRotationRollPitchYaw(axes[1], axes[2], axes[0]);
+		mainCam->Pos.m128_f32[1] = 0;
 	}
 	//unset rotations
 	else{
