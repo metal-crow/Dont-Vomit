@@ -10,8 +10,8 @@
 #define YTOP 32768
 #define YBOTTOM -32768
 
-#define XDEADZONE 800
-#define YDEADZONE 800
+#define XDEADZONE 1000
+#define YDEADZONE 1000
 
 #define circle 8092
 #define cross 4096
@@ -22,6 +22,16 @@
 
 unsigned char flicker_frames = 30;
 				
-float timings[] = { 5, 78, 10, 78, 18, 24.1, 24, 36.1, 36, 55, 55, 145 };
+//i is start time, i+1 is length
+float timings[] = { 5, 46, //flickering
+					10, 41, //faster flickering
+					23, 8.1, //IPD 1
+					31, 8, //IPD 2
+					39, 12, //IPD rand
+					51, 40, //IPD crossed
+					63, 17, //yaw and pitch
+				 };
 
+#define STARTTIME 40*FPS //timings[12]*FPS
+#define DEBUGGING 1
 #endif
