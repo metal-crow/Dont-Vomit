@@ -165,6 +165,129 @@ static bool SetupMainLoop(){
 
 #define CHECK_TIMING(i) (((float)(frameIndex / FPS) > timings[i]) && ((float)(frameIndex / FPS) < (timings[i+1]+timings[i])))
 
+void enable_effects(){
+	//standard timing based enable
+	for (int i = 0; i < NUM_EFFECTS; i++){
+		if (CHECK_TIMING(i*2)){
+			effects_enabled[i] = true;
+		}
+		else{
+			effects_enabled[i] = false;
+		}
+	}
+
+	//start randomly enabling effects
+}
+static ovrVector3f      IPD_Persistance_copy[2];
+static float axes[3] = { 0, 0, 0 };//roll, pitch, yaw
+static int latency = 1;
+static XMMATRIX buffered_frames[25 * 2];
+
+void trigger_effects(ovrVector3f* HmdToEyeOffset){
+	//flicker every few frames
+	if (effects_enabled[0]){
+		#ifdef DEBUGGING
+				printf("flickering ");
+		#endif
+		if (frameIndex%flicker_frames == 0){
+			for (int i = 0; i < roomScene->numModels; i++){
+				uint32_t color = ((rand() & 0xff) << 24) | ((rand() & 0xff) << 16) | ((rand() & 0xff) << 8) | ((rand() & 0xff) << 0);
+				roomScene->Models[i]->Fill->Tex->AutoFillTexture(7, color);
+			}
+		}
+	}
+
+	//increase flickr amount
+	if (effects_enabled[1]){
+		flicker_frames = 3;
+	}
+
+	//reset back to walls
+	if (!effects_enabled[0] && !effects_enabled[1]){
+		for (int i = 0; i < roomScene->numModels; i++){
+			roomScene->Models[i]->Fill->Tex->AutoFillTexture(2);
+		}
+	}
+
+	//slowly ajust IPD normal->wide
+	if (effects_enabled[2]){
+		#ifdef DEBUGGING
+				printf("IPD1 ");
+		#endif
+		float percent = (frameIndex - FPS * timings[4]) / (FPS * timings[5]);
+		HmdToEyeOffset[0].x -= (float)0.65*percent;
+		HmdToEyeOffset[1].x += (float)0.65*percent;
+	}
+
+	//more quickly ajust IPD wide--->normal--->small
+	if (effects_enabled[3]){
+		#ifdef DEBUGGING
+				printf("IPD2 ");
+		#endif
+		float percent = (frameIndex - FPS * timings[6]) / (FPS * timings[7]);
+		HmdToEyeOffset[0].x = (HmdToEyeOffset[0].x - 0.65) + 1.5*percent;
+		HmdToEyeOffset[1].x = (HmdToEyeOffset[1].x + 0.65) - 1.5*percent;
+	}
+
+	//quickly and randomly ajust IDP every few frames
+	if (effects_enabled[4]){
+		#ifdef DEBUGGING
+				printf("IPD_rand ");
+		#endif
+		if (frameIndex % 13 == 0){
+			HmdToEyeOffset[0].x = (float)((rand() / (float)RAND_MAX) - 0.5);
+			HmdToEyeOffset[0].y = (float)(((rand()*0.75) / (float)RAND_MAX) - 0.375);
+			HmdToEyeOffset[1].x = (float)((rand() / (float)RAND_MAX) - 0.5);
+			HmdToEyeOffset[1].y = (float)(((rand()*0.75) / (float)RAND_MAX) - 0.375);
+			memcpy(IPD_Persistance_copy, HmdToEyeOffset, sizeof(HmdToEyeOffset));
+		}
+		else{
+			memcpy(HmdToEyeOffset, IPD_Persistance_copy, sizeof(HmdToEyeOffset));
+		}
+	}
+
+	//cross eyes
+	if (effects_enabled[5]){
+		#ifdef DEBUGGING
+				printf("IPD_cross ");
+		#endif
+		float ipd_0_x = HmdToEyeOffset[0].x;
+		HmdToEyeOffset[0].x = HmdToEyeOffset[1].x + 0.5;
+		HmdToEyeOffset[1].x = ipd_0_x - 0.5;
+	}
+
+	//slowly rotate yaw and pitch
+	if (effects_enabled[6]){
+		#ifdef DEBUGGING
+				printf("roll_pitch_yaw ");
+		#endif
+		if (frameIndex % 6 == 0){
+			axes[2] += 0.003;
+			axes[1] += 0.003;
+			axes[0] += 0.003;
+			mainCam->Rot = XMQuaternionRotationRollPitchYaw(axes[1], axes[2], axes[0]);
+		}
+	}
+	//unset rotations
+	else{
+		mainCam->Rot = XMQuaternionRotationRollPitchYaw(0, 0, 0);
+	}
+
+	//increase latency up to 25ms
+	if (effects_enabled[7]){
+		#ifdef DEBUGGING
+				printf("latency:%d ", latency);
+		#endif
+		if (latency < 25 && frameIndex % 20 == 0){
+			latency++;
+		}
+	}
+
+	#ifdef DEBUGGING
+		printf("%d\n", frameIndex);
+	#endif
+}
+
 // return false to quit 
 static bool MainLoop()
 {
@@ -199,8 +322,11 @@ static bool MainLoop()
 		printf("Time %f\n", frameIndex / FPS);
 	}
 
-	//**Get dynamic rift settings**
+	//**Handle verification user is playing**
+	
 
+
+	//**Get dynamic rift settings**
 	// Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
 	ovrEyeRenderDesc eyeRenderDesc[2];
 	eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmdDesc.DefaultEyeFov[0]);
@@ -212,108 +338,10 @@ static bool MainLoop()
 										   eyeRenderDesc[1].HmdToEyeOffset };
 
 	//**Perform the unplesantness based on running time
-
-	//flicker every few frames
-	if (CHECK_TIMING(0)){
-#ifdef DEBUGGING
-		printf("flickering ");
-#endif
-		if (frameIndex%flicker_frames == 0){
-			for (int i = 0; i < roomScene->numModels; i++){
-				uint32_t color = ((rand() & 0xff) << 24) | ((rand() & 0xff) << 16) | ((rand() & 0xff) << 8) | ((rand() & 0xff) << 0);
-				roomScene->Models[i]->Fill->Tex->AutoFillTexture(7, color);
-			}
-		}
-	}
-	//increase flickr amount
-	if (CHECK_TIMING(2)){
-		flicker_frames = 3;
-	}
-	//reset back to walls
-	else{
-		for (int i = 0; i < roomScene->numModels; i++){
-			roomScene->Models[i]->Fill->Tex->AutoFillTexture(2);
-		}
-	}
-	//slowly ajust IPD normal->wide
-	if (CHECK_TIMING(4)){
-#ifdef DEBUGGING
-		printf("IPD1 ");
-#endif
-		float percent = (frameIndex - FPS * timings[4]) / (FPS * timings[5]);
-		HmdToEyeOffset[0].x -= (float)0.65*percent;
-		HmdToEyeOffset[1].x += (float)0.65*percent;
-	}
-	//more quickly ajust IPD wide--->normal--->small
-	if (CHECK_TIMING(6)){
-#ifdef DEBUGGING
-		printf("IPD2 ");
-#endif
-		float percent = (frameIndex - FPS * timings[6]) / (FPS * timings[7]);
-		HmdToEyeOffset[0].x = (HmdToEyeOffset[0].x-0.65) + 1.5*percent;
-		HmdToEyeOffset[1].x = (HmdToEyeOffset[1].x+0.65) - 1.5*percent;
-	}
-	//quickly and randomly ajust IDP every few frames
-	if (CHECK_TIMING(8)){
-		static ovrVector3f      IPD_Persistance_copy[2];
-#ifdef DEBUGGING
-		printf("IPD_rand ");
-#endif
-		if (frameIndex % 13 == 0){
-			HmdToEyeOffset[0].x = (float)((rand() / (float)RAND_MAX) - 0.5);
-			HmdToEyeOffset[0].y = (float)(((rand()*0.75) / (float)RAND_MAX) - 0.375);
-			HmdToEyeOffset[1].x = (float)((rand() / (float)RAND_MAX) - 0.5);
-			HmdToEyeOffset[1].y = (float)(((rand()*0.75) / (float)RAND_MAX) - 0.375);
-			memcpy(IPD_Persistance_copy, HmdToEyeOffset, sizeof(HmdToEyeOffset));
-		}
-		else{
-			memcpy(HmdToEyeOffset,IPD_Persistance_copy, sizeof(HmdToEyeOffset));
-		}
-	}
-	//cross eyes
-	if (CHECK_TIMING(10)){
-#ifdef DEBUGGING
-		printf("IPD_cross ");
-#endif
-		float ipd_0_x = HmdToEyeOffset[0].x;
-		HmdToEyeOffset[0].x = HmdToEyeOffset[1].x+0.5;
-		HmdToEyeOffset[1].x = ipd_0_x-0.5;
-	}
-	//slowly rotate yaw and pitch
-	if (CHECK_TIMING(12)){
-		static float axes[3] = { 0, 0, 0 };//roll, pitch, yaw
-#ifdef DEBUGGING
-		printf("roll_pitch_yaw ");
-#endif
-		if (frameIndex % 6 == 0){
-			axes[2] += 0.003;
-			axes[1] += 0.003;
-			axes[0] += 0.003;
-			mainCam->Rot = XMQuaternionRotationRollPitchYaw(axes[1], axes[2], axes[0]);
-		}
-	}
-	//unset rotations
-	else{
-		mainCam->Rot = XMQuaternionRotationRollPitchYaw(0,0,0);
-	}
-	//increase latency up to 25ms
-	static int latency = 1;
-	static XMMATRIX buffered_frames[25 * 2];
-	if (CHECK_TIMING(14)){
-#ifdef DEBUGGING
-		printf("latency:%d ",latency);
-#endif
-		if (latency < 25 && frameIndex % 20 == 0){
-			latency++;
-		}
-	}
-
-#ifdef DEBUGGING
-	printf("%d\n", frameIndex);
-#endif
+	enable_effects();
+	trigger_effects(HmdToEyeOffset);
 
 	//**Render Scene**
-
 	double sensorSampleTime;    // sensorSampleTime is fed into the layer later
 	ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime);
 

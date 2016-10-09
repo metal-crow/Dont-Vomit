@@ -21,9 +21,11 @@
 #define FPS 90.0
 
 unsigned char flicker_frames = 30;
+
+#define NUM_EFFECTS 8
 				
 //i is start time, i+1 is length
-float timings[] = { 5, 46, //flickering
+float timings[] = { 5, 66, //flickering
 					11, 60, //faster flickering
 					23, 16.1, //IPD 1
 					39, 16, //IPD 2
@@ -32,6 +34,8 @@ float timings[] = { 5, 46, //flickering
 					83, 29, //yaw and pitch
 					100, INFINITY, //latency
 				 };
+//if an effect is enabled
+bool effects_enabled[NUM_EFFECTS];
 
 #define STARTTIME 0
 #define DEBUGGING 1
