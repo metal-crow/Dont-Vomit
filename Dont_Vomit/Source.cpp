@@ -201,8 +201,12 @@ void verify_user_playing(ovrPosef EyeRenderPose[2]){
 
 	if (lost_track_time > FPS*SECONDS_TO_GAME_OVER){
 		game_over = true;
+		printf("You lasted %f seconds\n", FPS*frameIndex);
 	}
-	printf("tracking time %d\n", lost_track_time);
+
+	#if DEBUGGING_USER_VERIFY
+		printf("lost_track_time %d\n", lost_track_time);
+	#endif
 }
 
 #define CHECK_TIMING(i) (((float)(frameIndex / FPS) > timings[i]) && ((float)(frameIndex / FPS) < (timings[i+1]+timings[i])))
@@ -234,7 +238,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 		if (frameIndex%flicker_frames == 0){
 			for (int i = 0; i < roomScene->numModels; i++){
 				uint32_t color = ((rand() & 0xff) << 24) | ((rand() & 0xff) << 16) | ((rand() & 0xff) << 8) | ((rand() & 0xff) << 0);
-				roomScene->Models[i]->Fill->Tex->AutoFillTexture(7, color);
+				roomScene->Models[i]->Fill->Tex->AutoFillTexture(Texture::AUTO_COLOR, color);
 			}
 		}
 	}
@@ -247,7 +251,7 @@ void trigger_effects(ovrVector3f* HmdToEyeOffset){
 	//reset back to walls
 	if (!effects_enabled[0] && !effects_enabled[1]){
 		for (int i = 0; i < roomScene->numModels; i++){
-			roomScene->Models[i]->Fill->Tex->AutoFillTexture(2);
+			roomScene->Models[i]->Fill->Tex->AutoFillTexture(Texture::AUTO_WALL);
 		}
 	}
 

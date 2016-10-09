@@ -50,5 +50,6 @@ bool effects_enabled[NUM_EFFECTS];
 //helper
 #define STARTTIME 0
 #define DEBUGGING_CUR_EFFECT 1
+#define DEBUGGING_USER_VERIFY 1
 
 #endif
