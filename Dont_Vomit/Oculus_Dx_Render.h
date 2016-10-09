@@ -359,7 +359,7 @@ struct Texture
 	ID3D11RenderTargetView     * TexRtv;
 	int                          SizeW, SizeH, MipLevels;
 
-	enum { AUTO_WHITE = 1, AUTO_WALL, AUTO_FLOOR, AUTO_CEILING, AUTO_GRID, AUTO_GRADE_256 };
+	enum { AUTO_WHITE = 1, AUTO_WALL, AUTO_FLOOR, AUTO_CEILING, AUTO_GRID, AUTO_GRADE_256, AUTO_COLOR };
 	Texture() : Tex(nullptr), TexSv(nullptr), TexRtv(nullptr) {};
 	void Init(int sizeW, int sizeH, bool rendertarget, int mipLevels, int sampleCount)
 	{
@@ -439,28 +439,32 @@ struct Texture
 		*linear = (*linear & 0xff000000) + (drgb[2] << 16) + (drgb[1] << 8) + (drgb[0] << 0);
 	}
 
-	void AutoFillTexture(int autoFillData)
+	void AutoFillTexture(int autoFillType, uint32_t color = 0xffffffff)
 	{
 		uint32_t * pix = (uint32_t *)malloc(sizeof(uint32_t) *  SizeW * SizeH);
 		for (int j = 0; j < SizeH; j++)
 			for (int i = 0; i < SizeW; i++)
 			{
 				uint32_t * curr = &pix[j*SizeW + i];
-				switch (autoFillData)
+				switch (autoFillType)
 				{
 				case(AUTO_WALL) : *curr = (((j / 4 & 15) == 0) || (((i / 4 & 15) == 0) && ((((i / 4 & 31) == 0) ^ ((j / 4 >> 4) & 1)) == 0))) ?
 					0xff3c3c3c : 0xffb4b4b4; break;
 				case(AUTO_FLOOR) : *curr = (((i >> 7) ^ (j >> 7)) & 1) ? 0xffb4b4b4 : 0xff505050;   break;
 				case(AUTO_CEILING) : *curr = (i / 4 == 0 || j / 4 == 0) ? 0xff505050 : 0xffb4b4b4;  break;
-				case(AUTO_WHITE) : *curr = 0xffffffff;                                              break;
 				case(AUTO_GRADE_256) : *curr = 0xff000000 + i * 0x010101;                             break;
 				case(AUTO_GRID) : *curr = (i<4) || (i>(SizeW - 5)) || (j<4) || (j>(SizeH - 5)) ? 0xffffffff : 0xff000000; break;
-				default: *curr = 0xffffffff;              break;
+				default:
+				case(AUTO_COLOR) : *curr = color; break;
 				}
 			}
 
 		FillTexture(pix);
 		free(pix);
+	}
+
+	void SetTextureMat(unsigned char* input){
+		DIRECTX.Context->UpdateSubresource(Tex, 0, NULL, input, SizeW * 4, SizeH * SizeW * 4);
 	}
 };
 
@@ -791,6 +795,7 @@ struct Scene
 	static const int MAX_MODELS = 100;
 	Model *Models[MAX_MODELS];
 	int numModels;
+	Model* timer;
 
 	void Add(Model * n)
 	{
@@ -800,123 +805,51 @@ struct Scene
 
 	void Render(XMMATRIX * projView, float R, float G, float B, float A, bool standardUniforms)
 	{
-		for (int i = 0; i < numModels; ++i)
+		for (int i = 0; i < numModels; ++i){
 			Models[i]->Render(projView, R, G, B, A, standardUniforms);
+		}
+		//timer->Render(projView, R, G, B, A, standardUniforms);
 	}
 
-	void RenderInstanced(XMMATRIX * projViews, float R, float G, float B, float A, bool standardUniforms)
+	void Init()
 	{
-		for (int i = 0; i < numModels; ++i)
-			Models[i]->RenderInstanced(projViews, R, G, B, A, standardUniforms);
-	}
-
-	void Init(bool includeIntensiveGPUobject)
-	{
-		TriangleSet cube;
-		cube.AddSolidColorBox(0.5f, -0.5f, 0.5f, -0.5f, 0.5f, -0.5f, 0xff404040);
-		Add(
-			new Model(&cube, XMFLOAT3(0, 0, 0), XMFLOAT4(0, 0, 0, 1),
-			new Material(
-			new Texture(false, 256, 256, Texture::AUTO_CEILING)
-			)
-			)
-			);
-
-		TriangleSet spareCube;
-		spareCube.AddSolidColorBox(0.1f, -0.1f, 0.1f, -0.1f, +0.1f, -0.1f, 0xffff0000);
-		Add(
-			new Model(&spareCube, XMFLOAT3(0, -10, 0), XMFLOAT4(0, 0, 0, 1),
-			new Material(
-			new Texture(false, 256, 256, Texture::AUTO_CEILING)
-			)
-			)
-			);
-
 		TriangleSet walls;
 		walls.AddSolidColorBox(10.1f, 0.0f, 20.0f, 10.0f, 4.0f, -20.0f, 0xff808080);  // Left Wall
 		walls.AddSolidColorBox(10.0f, -0.1f, 20.1f, -10.0f, 4.0f, 20.0f, 0xff808080); // Back Wall
 		walls.AddSolidColorBox(-10.0f, -0.1f, 20.0f, -10.1f, 4.0f, -20.0f, 0xff808080);   // Right Wall
 		Add(
 			new Model(&walls, XMFLOAT3(0, 0, 0), XMFLOAT4(0, 0, 0, 1),
-			new Material(
-			new Texture(false, 256, 256, Texture::AUTO_WALL)
-			)
-			)
-			);
-
-		if (includeIntensiveGPUobject)
-		{
-			TriangleSet partitions;
-			for (float depth = 0.0f; depth > -3.0f; depth -= 0.1f)
-				partitions.AddSolidColorBox(9.0f, 0.5f, -depth, -9.0f, 3.5f, -depth, 0x10ff80ff); // Partition
-			Add(
-				new Model(&partitions, XMFLOAT3(0, 0, 0), XMFLOAT4(0, 0, 0, 1),
 				new Material(
-				new Texture(false, 256, 256, Texture::AUTO_FLOOR)
+					new Texture(false, 256, 256, Texture::AUTO_WALL)
 				)
-				)
-				); // Floors
-		}
+			)
+		);
 
 		TriangleSet floors;
 		floors.AddSolidColorBox(10.0f, -0.1f, 20.0f, -10.0f, 0.0f, -20.1f, 0xff808080); // Main floor
-		floors.AddSolidColorBox(15.0f, -6.1f, -18.0f, -15.0f, -6.0f, -30.0f, 0xff808080); // Bottom floor
 		Add(
 			new Model(&floors, XMFLOAT3(0, 0, 0), XMFLOAT4(0, 0, 0, 1),
-			new Material(
-			new Texture(false, 256, 256, Texture::AUTO_FLOOR)
+				new Material(
+					new Texture(false, 256, 256, Texture::AUTO_FLOOR)
+				)
 			)
-			)
-			); // Floors
+		); // Floors
 
 		TriangleSet ceiling;
 		ceiling.AddSolidColorBox(10.0f, 4.0f, 20.0f, -10.0f, 4.1f, -20.1f, 0xff808080);
 		Add(
 			new Model(&ceiling, XMFLOAT3(0, 0, 0), XMFLOAT4(0, 0, 0, 1),
-			new Material(
-			new Texture(false, 256, 256, Texture::AUTO_CEILING)
+				new Material(
+					new Texture(false, 256, 256, Texture::AUTO_CEILING)
+				)
 			)
-			)
-			); // Ceiling
-
-		TriangleSet furniture;
-		furniture.AddSolidColorBox(-9.5f, 0.75f, -3.0f, -10.1f, 2.5f, -3.1f, 0xff383838);    // Right side shelf// Verticals
-		furniture.AddSolidColorBox(-9.5f, 0.95f, -3.7f, -10.1f, 2.75f, -3.8f, 0xff383838);   // Right side shelf
-		furniture.AddSolidColorBox(-9.55f, 1.20f, -2.5f, -10.1f, 1.30f, -3.75f, 0xff383838); // Right side shelf// Horizontals
-		furniture.AddSolidColorBox(-9.55f, 2.00f, -3.05f, -10.1f, 2.10f, -4.2f, 0xff383838); // Right side shelf
-		furniture.AddSolidColorBox(-5.0f, 1.1f, -20.0f, -10.0f, 1.2f, -20.1f, 0xff383838);   // Right railing   
-		furniture.AddSolidColorBox(10.0f, 1.1f, -20.0f, 5.0f, 1.2f, -20.1f, 0xff383838);   // Left railing  
-		for (float f = 5; f <= 9; f += 1)
-			furniture.AddSolidColorBox(-f, 0.0f, -20.0f, -f - 0.1f, 1.1f, -20.1f, 0xff505050); // Left Bars
-		for (float f = 5; f <= 9; f += 1)
-			furniture.AddSolidColorBox(f, 1.1f, -20.0f, f + 0.1f, 0.0f, -20.1f, 0xff505050); // Right Bars
-		furniture.AddSolidColorBox(1.8f, 0.8f, -1.0f, 0.0f, 0.7f, 0.0f, 0xff505000);  // Table
-		furniture.AddSolidColorBox(1.8f, 0.0f, 0.0f, 1.7f, 0.7f, -0.1f, 0xff505000); // Table Leg 
-		furniture.AddSolidColorBox(1.8f, 0.7f, -1.0f, 1.7f, 0.0f, -0.9f, 0xff505000); // Table Leg 
-		furniture.AddSolidColorBox(0.0f, 0.0f, -1.0f, 0.1f, 0.7f, -0.9f, 0xff505000);  // Table Leg 
-		furniture.AddSolidColorBox(0.0f, 0.7f, 0.0f, 0.1f, 0.0f, -0.1f, 0xff505000);  // Table Leg 
-		furniture.AddSolidColorBox(1.4f, 0.5f, 1.1f, 0.8f, 0.55f, 0.5f, 0xff202050);  // Chair Set
-		furniture.AddSolidColorBox(1.401f, 0.0f, 1.101f, 1.339f, 1.0f, 1.039f, 0xff202050); // Chair Leg 1
-		furniture.AddSolidColorBox(1.401f, 0.5f, 0.499f, 1.339f, 0.0f, 0.561f, 0xff202050); // Chair Leg 2
-		furniture.AddSolidColorBox(0.799f, 0.0f, 0.499f, 0.861f, 0.5f, 0.561f, 0xff202050); // Chair Leg 2
-		furniture.AddSolidColorBox(0.799f, 1.0f, 1.101f, 0.861f, 0.0f, 1.039f, 0xff202050); // Chair Leg 2
-		furniture.AddSolidColorBox(1.4f, 0.97f, 1.05f, 0.8f, 0.92f, 1.10f, 0xff202050); // Chair Back high bar
-		for (float f = 3.0f; f <= 6.6f; f += 0.4f)
-			furniture.AddSolidColorBox(3, 0.0f, -f, 2.9f, 1.3f, -f - 0.1f, 0xff404040); // Posts
-		Add(
-			new Model(&furniture, XMFLOAT3(0, 0, 0), XMFLOAT4(0, 0, 0, 1),
-			new Material(
-			new Texture(false, 256, 256, Texture::AUTO_WHITE)
-			)
-			)
-			); // Fixtures & furniture
+		); // Ceiling
 	}
 
-	Scene() : numModels(0) {}
-	Scene(bool includeIntensiveGPUobject) :
+	Scene() :
 		numModels(0)
 	{
-		Init(includeIntensiveGPUobject);
+		Init();
 	}
 	void Release()
 	{
@@ -966,6 +899,6 @@ struct Utility
 	}
 } static Util;
 
-#endif // OVR_Win32_DirectXAppUtil_h
+#endif 
 
 
