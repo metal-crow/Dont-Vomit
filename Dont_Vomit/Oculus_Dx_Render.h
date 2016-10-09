@@ -816,6 +816,7 @@ struct Scene
 		TriangleSet walls;
 		walls.AddSolidColorBox(10.1f, 0.0f, 20.0f, 10.0f, 4.0f, -20.0f, 0xff808080);  // Left Wall
 		walls.AddSolidColorBox(10.0f, -0.1f, 20.1f, -10.0f, 4.0f, 20.0f, 0xff808080); // Back Wall
+		walls.AddSolidColorBox(10.0f, -0.1f, -20.1f, -10.0f, 4.0f, -20.0f, 0xff808080); // Front Wall
 		walls.AddSolidColorBox(-10.0f, -0.1f, 20.0f, -10.1f, 4.0f, -20.0f, 0xff808080);   // Right Wall
 		Add(
 			new Model(&walls, XMFLOAT3(0, 0, 0), XMFLOAT4(0, 0, 0, 1),

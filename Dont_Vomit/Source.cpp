@@ -166,6 +166,7 @@ static bool SetupMainLoop(){
 #define CHECK_TIMING(i) (((float)(frameIndex / FPS) > timings[i]) && ((float)(frameIndex / FPS) < timings[i+1]))
 
 ovrVector3f      IPD_Persistance_copy[2];
+static float Yaw = 0;
 
 // return false to quit 
 static bool MainLoop()
@@ -181,34 +182,25 @@ static bool MainLoop()
 	//get controller state and movemenet
 	XINPUT_STATE controller_state;
 	DWORD dwResult = XInputGetState(0, &controller_state);
-	if (dwResult == ERROR_SUCCESS)
-	{
-		if (controller_state.Gamepad.sThumbLY > YDEADZONE){
+	if (controller_state.Gamepad.sThumbLY > YDEADZONE || DIRECTX.Key['W'] || DIRECTX.Key[VK_UP]){
+		if (mainCam->Pos.m128_f32[2]>-19.9)
 			mainCam->Pos = XMVectorAdd(mainCam->Pos, forward);
-		}
-		if (controller_state.Gamepad.sThumbLY < -YDEADZONE){
-			mainCam->Pos = XMVectorAdd(mainCam->Pos, backward);
-		}
-		if (controller_state.Gamepad.sThumbLX < -XDEADZONE){
-			mainCam->Pos = XMVectorAdd(mainCam->Pos, left);
-		}
-		if (controller_state.Gamepad.sThumbLX > XDEADZONE){
-			mainCam->Pos = XMVectorAdd(mainCam->Pos, right);
-		}
-		if (controller_state.Gamepad.wButtons > 0){
-			printf("Time %f\n", frameIndex / FPS);
-		}
 	}
-
-	//get keyboard state and motion
-	if (DIRECTX.Key['W'] || DIRECTX.Key[VK_UP])	  mainCam->Pos = XMVectorAdd(mainCam->Pos, forward);
-	if (DIRECTX.Key['S'] || DIRECTX.Key[VK_DOWN]) mainCam->Pos = XMVectorAdd(mainCam->Pos, backward);
-	if (DIRECTX.Key['D'])                         mainCam->Pos = XMVectorAdd(mainCam->Pos, right);
-	if (DIRECTX.Key['A'])                         mainCam->Pos = XMVectorAdd(mainCam->Pos, left);
-	static float Yaw = 0;
-	if (DIRECTX.Key[VK_LEFT])  mainCam->Rot = XMQuaternionRotationRollPitchYaw(0, Yaw += 0.02f, 0);
-	if (DIRECTX.Key[VK_RIGHT]) mainCam->Rot = XMQuaternionRotationRollPitchYaw(0, Yaw -= 0.02f, 0);
-
+	if (controller_state.Gamepad.sThumbLY < -YDEADZONE || DIRECTX.Key['S'] || DIRECTX.Key[VK_DOWN]){
+		if (mainCam->Pos.m128_f32[2]<19.9)
+			mainCam->Pos = XMVectorAdd(mainCam->Pos, backward);
+	}
+	if (controller_state.Gamepad.sThumbLX < -XDEADZONE || DIRECTX.Key['A']){
+		if (mainCam->Pos.m128_f32[0]>-9.9)
+			mainCam->Pos = XMVectorAdd(mainCam->Pos, left);
+	}
+	if (controller_state.Gamepad.sThumbLX > XDEADZONE || DIRECTX.Key['D']){
+		if (mainCam->Pos.m128_f32[0]<9.9)
+			mainCam->Pos = XMVectorAdd(mainCam->Pos, right);
+	}
+	if (controller_state.Gamepad.wButtons > 0){
+		printf("Time %f\n", frameIndex / FPS);
+	}
 
 	//**Get dynamic rift settings**
 

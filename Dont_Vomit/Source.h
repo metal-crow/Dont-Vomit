@@ -10,8 +10,8 @@
 #define YTOP 32768
 #define YBOTTOM -32768
 
-#define XDEADZONE 600
-#define YDEADZONE 600
+#define XDEADZONE 800
+#define YDEADZONE 800
 
 #define circle 8092
 #define cross 4096
