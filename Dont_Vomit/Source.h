@@ -28,10 +28,11 @@ float timings[] = { 5, 46, //flickering
 					23, 8.1, //IPD 1
 					31, 8, //IPD 2
 					39, 12, //IPD rand
-					51, 40, //IPD crossed
+					51, INFINITY, //IPD crossed
 					63, 17, //yaw and pitch
+					80, INFINITY, //latency
 				 };
 
-#define STARTTIME 40*FPS //timings[12]*FPS
+#define STARTTIME 78*FPS //timings[12]*FPS
 #define DEBUGGING 1
 #endif

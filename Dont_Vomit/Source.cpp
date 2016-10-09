@@ -165,9 +165,6 @@ static bool SetupMainLoop(){
 
 #define CHECK_TIMING(i) (((float)(frameIndex / FPS) > timings[i]) && ((float)(frameIndex / FPS) < (timings[i+1]+timings[i])))
 
-ovrVector3f      IPD_Persistance_copy[2];
-static float axes[3] = { 0, 0, 0 };//roll, pitch, yaw
-
 // return false to quit 
 static bool MainLoop()
 {
@@ -252,6 +249,7 @@ static bool MainLoop()
 	}
 	//quickly and randomly ajust IDP every few frames
 	if (CHECK_TIMING(8)){
+		static ovrVector3f      IPD_Persistance_copy[2];
 #ifdef DEBUGGING
 		printf("IPD_rand ");
 #endif
@@ -277,6 +275,7 @@ static bool MainLoop()
 	}
 	//slowly rotate yaw and pitch
 	if (CHECK_TIMING(12) && frameIndex % 6 == 0){
+		static float axes[3] = { 0, 0, 0 };//roll, pitch, yaw
 #ifdef DEBUGGING
 		printf("roll_pitch_yaw ");
 #endif
@@ -285,11 +284,20 @@ static bool MainLoop()
 		axes[0] += 0.003;
 		mainCam->Rot = XMQuaternionRotationRollPitchYaw(axes[1], axes[2], axes[0]);
 	}
-
+	//increase latency up to 25ms
+	static int latency = 1;
+	static XMMATRIX buffered_frames[25 * 2];
+	if (CHECK_TIMING(14)){
+#ifdef DEBUGGING
+		printf("latency:%d ",latency);
+#endif
+		if (latency < 25 && frameIndex % 20 == 0){
+			latency++;
+		}
+	}
 
 #ifdef DEBUGGING
 	printf("%d\n", frameIndex);
-	printf("%f %f\n", HmdToEyeOffset[0].x, HmdToEyeOffset[1].x);
 #endif
 
 	//**Render Scene**
@@ -320,9 +328,25 @@ static bool MainLoop()
 				p.M[0][1], p.M[1][1], p.M[2][1], p.M[3][1],
 				p.M[0][2], p.M[1][2], p.M[2][2], p.M[3][2],
 				p.M[0][3], p.M[1][3], p.M[2][3], p.M[3][3]);
-			XMMATRIX prod = XMMatrixMultiply(view, proj);
-			roomScene->Render(&prod, 1, 1, 1, 1, true);
+			XMMATRIX prod;
 
+			if (CHECK_TIMING(14)){
+				XMMATRIX new_prod = XMMatrixMultiply(view, proj);
+				//put this new frame into queue
+				buffered_frames[(latency - 1) * 2 + eye] = new_prod;
+				//use new in queue as frame
+				prod = buffered_frames[eye];
+				//shift queue down
+				for (int i = eye; i < (latency*2)-2; i+=2){
+					buffered_frames[i] = buffered_frames[i + 2];
+				}
+			}
+			else{
+				prod = XMMatrixMultiply(view, proj);
+				buffered_frames[(latency - 1) * 2 + eye] = prod;
+			}
+
+			roomScene->Render(&prod, 1, 1, 1, 1, true);
 			// Commit rendering to the swap chain
 			pEyeRenderTexture[eye]->Commit();
 		}
